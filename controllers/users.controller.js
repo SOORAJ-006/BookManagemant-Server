@@ -1,7 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const userService = require("../services/users.services");
 const bcrypt = require("bcrypt");
-const jwt = require('jsonwebtoken')
+const jwt = require("jsonwebtoken");
 
 /**
  * @description User Register
@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken')
 const userRegistration = asyncHandler(async (req, res) => {
   const { username, password, email } = req.body;
   const userAvailable = await userService.findOne(email);
-  console.log(userAvailable , '62323');
+  console.log(userAvailable, "62323");
   if (!userAvailable) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await userService.createUser(req.body, hashedPassword);
@@ -29,12 +29,26 @@ const userRegistration = asyncHandler(async (req, res) => {
  */
 
 const userLogin = asyncHandler(async (req, res) => {
-    const {email , password} = req.body
-    const user = await userService.findOne(email)
-    if(user && (await bcrypt.compare(password , user.password))){
-        
-        res.status(200).json(user);
-    }
+  const { email, password } = req.body;
+  const user = await userService.findOne(email);
+  if (user && (await bcrypt.compare(password, user.password))) {
+
+    const payload = { username: user.username, email: user.email, id: user.id };
+
+    const accessToken = jwt.sign(payload, process.env.SECRET_TOKEN, {
+      expiresIn: "30m",
+    });
+
+    // setting the cookie
+    res.cookie("token", accessToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 15 * 60 * 1000,
+    }); //15 min
+    res.status(200).json(accessToken);
+  } else {
+    res.status(404).json({ message: "user not found or incorrect password" });
+  }
 });
 
 /**
@@ -44,8 +58,7 @@ const userLogin = asyncHandler(async (req, res) => {
  */
 
 const userLogout = asyncHandler(async (req, res) => {
-  const user = await userService.deleteUser(req.params.id);
-  res.status(200).json(user);
+  res.clearCookie("token").json({message : "cokkie deleted successfully"});
 });
 
 module.exports = { userRegistration, userLogin, userLogout };
